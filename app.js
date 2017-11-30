@@ -1,115 +1,94 @@
 require('colors');
-let links = (str=>{
-    var tmp = str.split(/\s+/), tmp2 = [];
-    for (var i = 0; i < tmp.length; i++){
-        if (tmp[i] != '') tmp2.push(tmp[i]);
-    }
-    return tmp2;
-})(`
-    /en/faq/
-    /cat/game-center2/
-    /en/sellout/
-    /en/cat/night-club/
-    /item/fabbrica-1/
-    /cat/tavern/
-    /category/sellout/
-    /en/items/
-    /ru/faq-3/
-    /en/cat/recreation-center/
-    /contact-form/
-    /cat/sushi2/
-    /ru/cat/fast-food1/
-    /ru/item/fabbrica-2/
-    /posts-3/
-    /blog-1/
-    /cat/bar/
-    /ru/sellout-2/
-    /cat/recreation-center/
-    /ru/plans-listing-2/
-    /en/cat/pub/
-    /en/cat/teahouse/
-    /en/cat/bar/
-    /ru/cat/recreation-center1/
-    /cat/steak-house/
-    /plans-listing/
-    /en/cat/bakery/
-    /item/%D0%BC%D0%B0%D0%BA%D0%BB%D0%B0%D1%83%D0%B4/
-    /ru/cat/game-center1/
-    /ru/cat/sushi1/
-    /item/%D0%BA%D0%B0%D1%88%D1%82%D0%B0%D0%BD-2/
-    /ru/cat/teahouse1/
-    /ait-food-menu-tags/%D0%BC%D1%8F%D1%81%D0%BE/
-    /cat/restaurant2/
-    /cat/night-club2/
-    /en/cat/sushi/
-    /ru/items-3/
-    /cat/fast-food2/
-    /advertisements-3/
-    /faq-4/
-    /ru/cat/restaurant1/
-    /cat/pub/
-    /faq/
-    /en/cat/steak-house/
-    /items/
-    /en/cat/tavern/
-`),
-    request = require('request');
+const LoadingAnimation = require('loading-animation'),
+    fs = require('fs'),
+    request = require('request'),
+    Sitemapper = require('sitemapper'),
+    rl = require('readline').createInterface({
+        input: process.stdin,
+        output: process.stdout
+    }),
+    userAgents = [
+        {
+            name: 'Native',
+            string: 'Mozilla/5.0 (compatible; StringFinder/0.0.1-a; https://github.com/KaMeHb-UA)'
+        },
+        {
+            name: 'Chrome',
+            string: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36'
+        },
+    ];
 
-console.log('Fetching sitemap...'.yellow);
+let anim = new LoadingAnimation('Reading ./strings.list');
 
-(new (require('sitemapper'))()).fetch('https://foodguide.in.ua/sitemap.xml').then(function(sites){
-    class LoadingAnimation{
-        constructor(text = ''){
-            this.constructedWith = text;
-            this.internalTimer = (function(){
-                var P = [" \\ ", " | ", " / ", "---"];
-                var x = 0;
-                return setInterval(function(){
-                    process.stdout.clearLine();
-                    process.stdout.cursorTo(0);
-                    process.stdout.write(text + ' ' + P[x++]);
-                    x &= 3;
-                }, 250);
-            })();
-        }
-        stop(){
-            clearInterval(this.internalTimer);
-            process.stdout.clearLine();
-            process.stdout.cursorTo(0);
-            process.stdout.write(this.constructedWith + ' ');
-        }
-    }
-    (function checkUrl(url){
-        if (url){
-            var foundLinks = [],
-                staticText = 'Fetching ' + url + ' '
-                //*
-                , anim = new LoadingAnimation('Fetching ' + url)
-                /*/
-                process.stdout.write(staticText + '...'.blue)
-                //*/
-                ;
-            request(url, (error, response, body) => {
-                //*
-                anim.stop();
-                /*/
-                process.stdout.clearLine();
-                process.stdout.cursorTo(0);
-                process.stdout.write(staticText);
-                //*/
-                if (!error){
-                    links.forEach(link=>{
-                        if (body.indexOf(link) + 1) foundLinks.push(link);
-                    });
-                    console.log('OK'.green);
-                    foundLinks.forEach(link=>{
-                        console.log('    FOUND LINK MATCH: '.yellow + link);
-                    });
-                } else {
-                    console.log('cannot fetch url'.red);
-                }
-                checkUrl(sites.sites.shift());
+fs.readFile(__dirname + '/strings.list', 'utf8', (err, list) => {
+    anim.stop();
+    if (!err){
+        console.log('OK'.green);
+
+        let links = (() => {
+            var tmp = list.split(/[\r\n]?[\r\n]\s*/), tmp2 = [];
+            for (var i = 0; i < tmp.length; i++){
+                if (tmp[i] != '') tmp2.push(tmp[i]);
+            }
+            return tmp2;
+        })();
+
+        rl.question('Enter sitemap link (e.g. https://google.com/sitemap.xml): ', url => {
+            if (!url.match(/^https?:\/\/.*?\..*/)){
+                console.log('Not a valid address. Exiting...'.red);
+                process.exit(1);
+            }
+            console.log('List of included User Agents:');
+            userAgents.forEach((agent, i) => {
+                console.log(`[${i}] ` + `[${agent.name}]`.green + ` ${agent.string}`);
             });
-        }
-    })(sites.sites.shift());
+            rl.question(`Enter your choose [0 - ${userAgents.length - 1}]: ` , i => {
+                if (!userAgents[i]){
+                    console.log('Not a valid choice. Exiting...'.red);
+                    process.exit(1);
+                }
+                anim = new LoadingAnimation('Fetching sitemap'.yellow);
+                (new Sitemapper()).fetch(url).then(function(sites){
+                    anim.stop();
+                    console.log('OK'.green);
+                    (function checkUrl(url){
+                        if (url){
+                            var foundLinks = [];
+                            anim = new LoadingAnimation('Fetching ' + url);
+                            request(url, {
+                                    headers: {
+                                        'User-Agent': userAgents[i].string
+                                    }
+                                }, (error, response, body) => {
+                                anim.stop();
+                                if (!error){
+                                    links.forEach(link=>{
+                                        if (body.indexOf(link) + 1) foundLinks.push(link);
+                                    });
+                                    console.log('OK'.green);
+                                    foundLinks.forEach(link=>{
+                                        console.log('    FOUND LINK MATCH: '.yellow + link);
+                                    });
+                                } else {
+                                    console.log('FAIL'.red);
+                                }
+                                checkUrl(sites.sites.shift());
+                            });
+                        } else {
+                            console.log('All pages checked. Read log for more'.green);
+                            process.exit(0);
+                        }
+                    })(sites.sites.shift());
+                }).catch(function(reason){
+                    anim.stop();
+                    console.log('FAIL'.green + ` (${reason})`);
+                    process.exit(1);
+                });
+                 
+            })
+        });
+    } else {
+        console.log('FAIL'.red);
+        process.exit(1);
+    }
 });
