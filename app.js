@@ -67,7 +67,7 @@ fs.readFile(__dirname + '/strings.list', 'utf8', (err, list) => {
                                     });
                                     console.log('OK'.green);
                                     foundLinks.forEach(link=>{
-                                        console.log('    FOUND LINK MATCH: '.yellow + link);
+                                        console.log('    FOUND STRING MATCH: '.yellow + link);
                                     });
                                 } else {
                                     console.log('FAIL'.red);
